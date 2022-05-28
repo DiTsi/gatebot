@@ -1,30 +1,43 @@
 #!/usr/bin/python2
 
-import telegram
+import mraa
 import logging
+import requests
+import json
 from time import sleep
 
 BOT_TOKEN = 'nopass'
 # GROUP = -629434310
 GROUP = -nogroup #! test group
+SILENT = True
 
 logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level='INFO')
-bot = telegram.Bot(token=BOT_TOKEN)
 
 
-def get_new_messages(bot_, update_id=None):
-    try:
-        updates = bot_.get_updates(allowed_updates=['message'], offset=update_id)
-    except telegram.error.TimedOut:
-        logging.warning('Timeout')
-        return []
-    return updates
+class Bot:
+    def __init__(self, token):
+        self.token = token
+        self.link = "https://api.telegram.org/bot" + self.token
+
+
+    def get_updates(self, offset=None):
+        r = requests.get(self.link + "/getUpdates", params={"offset": offset})
+        content = json.loads(r.content.decode())
+
+        return content['result']
+
+
+    def send_message(self, chat_id, message):
+        r = requests.get(self.link + "/sendMessage", params={
+            'chat_id': chat_id,
+            'text': message,
+            })
 
 
 def filter_mentions(updates):
     for u in updates:
         message = u['message']
-        if len(message['entities']) == 0:
+        if 'entities' not in message.keys():
             updates.remove(u)
             continue
         if message['entities'][0]['type'] != 'mention':
@@ -35,7 +48,7 @@ def filter_mentions(updates):
 def filter_group(updates, group_id):
     for u in updates:
         message = u['message']
-        if message['chat_id'] != group_id:
+        if message['chat']['id'] != group_id:
             updates.remove(u)
     return updates
 
@@ -52,11 +65,16 @@ def get_messages(updates):
 
 
 if __name__ == '__main__':
+    gate = mraa.Gpio(2)
+    gate.dir(mraa.DIR_OUT)
+
+    bot = Bot(BOT_TOKEN)
+
     offset = None
     while True:
         logging.info('getting messages')
 
-        updates = get_new_messages(bot, update_id=offset)
+        updates = bot.get_updates(offset=offset)
         updates = filter_mentions(updates)
         updates = filter_group(updates, GROUP)
         updates, last_id = get_last_id(updates)
@@ -64,6 +82,11 @@ if __name__ == '__main__':
 
         messages = get_messages(updates)
         if len(messages):
+            gate.write(1)
+            sleep(0.5)
+            gate.write(0)
+
+            if not SILENT: bot.send_message(GROUP, 'done')
             logging.info('open / close gate')
 
-        sleep(4)
+        sleep(3)
