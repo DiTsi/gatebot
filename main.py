@@ -3,15 +3,16 @@
 import mraa
 import logging
 import requests
+import threading
 import json
 from time import sleep
+
 
 BOT_TOKEN = 'nopass'
 # GROUP = -629434310
 GROUP = -nogroup #! test group
 SILENT = True
-
-logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level='INFO')
+ENABLE_BUTTON_NOTIFICATION = True
 
 
 class Bot:
@@ -64,29 +65,55 @@ def get_messages(updates):
     return messages
 
 
-if __name__ == '__main__':
-    gate = mraa.Gpio(2)
-    gate.dir(mraa.DIR_OUT)
+def enable_notification():
+    global ENABLE_BUTTON_NOTIFICATION
+    
+    ENABLE_BUTTON_NOTIFICATION = True
 
-    bot = Bot(BOT_TOKEN)
 
-    offset = None
-    while True:
-        logging.info('getting messages')
+def button_handler(userdata):
+    global ENABLE_BUTTON_NOTIFICATION
 
-        updates = bot.get_updates(offset=offset)
-        updates = filter_mentions(updates)
-        updates = filter_group(updates, GROUP)
-        updates, last_id = get_last_id(updates)
-        offset = last_id + 1 if last_id is not None else None
+    if ENABLE_BUTTON_NOTIFICATION:
+        ENABLE_BUTTON_NOTIFICATION = False
+        logging.info('button pressed')
+        bot.send_message(GROUP, 'Button pressed, please open the gate')
+        timer.start()
 
-        messages = get_messages(updates)
-        if len(messages):
-            gate.write(1)
-            sleep(0.5)
-            gate.write(0)
 
-            if not SILENT: bot.send_message(GROUP, 'done')
-            logging.info('open / close gate')
 
-        sleep(3)
+bot = Bot(BOT_TOKEN)
+
+
+logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level='INFO')
+timer = threading.Timer(60.0, enable_notification)
+
+# gate output
+gate = mraa.Gpio(2)
+gate.dir(mraa.DIR_OUT)
+
+# button
+pin = mraa.Gpio(3)
+pin.dir(mraa.DIR_IN)
+pin.isr(mraa.EDGE_FALLING, button_handler, None)
+
+offset = None
+while True:
+    logging.info('getting messages')
+
+    updates = bot.get_updates(offset=offset)
+    updates = filter_mentions(updates)
+    updates = filter_group(updates, GROUP)
+    updates, last_id = get_last_id(updates)
+    offset = last_id + 1 if last_id is not None else None
+
+    messages = get_messages(updates)
+    if len(messages):
+        gate.write(1)
+        sleep(0.5)
+        gate.write(0)
+
+        if not SILENT: bot.send_message(GROUP, 'done')
+        logging.info('open / close gate')
+
+    sleep(3)
