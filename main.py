@@ -13,6 +13,7 @@ BOT_TOKEN = 'nopass'
 # GROUP = -nogroup #! test group
 GROUP = -nogroup #! test group 2
 SILENT = True
+MESSAGE_TIMEOUT = 30 # seconds
 # ENABLE_BUTTON_NOTIFICATION = True
 
 
@@ -37,18 +38,19 @@ class Bot:
 
 
 def filter_mentions(updates):
+    result = list()
+
     for u in updates:
         message = u['message']
-        if 'entities' not in message.keys():
-            updates.remove(u)
-            continue
-        if message['entities'][0]['type'] != 'mention':
-            updates.remove(u)
-    return updates
+        if 'entities' in message.keys():
+            if message['entities'][0]['type'] == 'mention':
+                result.append(u)
+    return result
 
 
 def filter_group(updates, group_id):
     result = list()
+
     for u in updates:
         message = u['message']
         if message['chat']['id'] == group_id:
@@ -56,12 +58,12 @@ def filter_group(updates, group_id):
     return result
 
 
-def filter_time(updates, group_id):
+def filter_time(updates):
     result = list()
+    
     for u in updates:
         message = u['message']
-        logging.info('timediff = %s' % (time.time() - int(message['date'])))
-        if time.time() - int(message['date']) < 30 :
+        if time.time() - int(message['date']) < MESSAGE_TIMEOUT:
             result.append(u)
     return result
 
@@ -115,7 +117,7 @@ while True:
     
     filtered_updates = filter_mentions(updates)
     filtered_updates = filter_group(filtered_updates, GROUP)
-    filtered_updates = filter_time(filtered_updates, GROUP)
+    filtered_updates = filter_time(filtered_updates)
     
     updates, last_id = get_last_id(updates)
     offset = last_id + 1 if last_id is not None else None
