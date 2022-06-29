@@ -2,6 +2,7 @@
 
 import mraa
 import logging
+from logging.handlers import TimedRotatingFileHandler
 import requests
 import threading
 import json
@@ -17,6 +18,29 @@ MESSAGE_TIMEOUT = 30 # seconds
 # ENABLE_BUTTON_NOTIFICATION = True
 
 
+class CustomFormatter(logging.Formatter):
+    grey = "\033[37m"
+    yellow = "\033[21m"
+    white = "\033[97m"
+    red = "\033[31m"
+    bold_red = "\033[1m"
+    reset = "\033[97m"
+    format = "%(asctime)s\t%(levelname)s\t%(message)s"
+
+    FORMATS = {
+        logging.DEBUG: grey + format + reset,
+        logging.INFO: white + format + reset,
+        logging.WARNING: yellow + format + reset,
+        logging.ERROR: red + format + reset,
+        logging.CRITICAL: bold_red + format + reset
+    }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
+
+
 class Bot:
     def __init__(self, token):
         self.token = token
@@ -24,17 +48,23 @@ class Bot:
 
 
     def get_updates(self, offset=None):
-        r = requests.get(self.link + "/getUpdates", params={"offset": offset})
-        content = json.loads(r.content.decode())
-
-        return content['result']
+        try:
+            r = requests.get(self.link + "/getUpdates", params={"offset": offset})
+            content = json.loads(r.content.decode())
+            return content['result']
+        except:
+            logger.error('Can\'t send GET request')
+            return {}
 
 
     def send_message(self, chat_id, message):
-        r = requests.get(self.link + "/sendMessage", params={
-            'chat_id': chat_id,
-            'text': message,
-            })
+        try:
+            r = requests.get(self.link + "/sendMessage", params={
+                'chat_id': chat_id,
+                'text': message,
+                })
+        except:
+            logger.error('Can\'t send message')
 
 
 def filter_mentions(updates):
@@ -90,14 +120,18 @@ def get_messages(updates):
 
 #     if ENABLE_BUTTON_NOTIFICATION:
 #         ENABLE_BUTTON_NOTIFICATION = False
-#         logging.info('button pressed')
+#         logger.info('button pressed')
 #         bot.send_message(GROUP, 'Button pressed, please open the gate')
 #         timer.start()
 
-
-
 bot = Bot(BOT_TOKEN)
-logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level='INFO')
+
+logger = logging.getLogger('main_logger')
+logger.setLevel('INFO')
+rfh = TimedRotatingFileHandler('/opt/telegram_bot/logs/bot.log', when='D', backupCount=7)
+rfh.setFormatter(CustomFormatter())
+logger.addHandler(rfh)
+
 # timer = threading.Timer(60.0, enable_notification)
 
 # gate output
@@ -111,7 +145,7 @@ gate.dir(mraa.DIR_OUT)
 
 offset = None
 while True:
-    logging.info('getting messages')
+    logger.info('getting messages')
 
     updates = bot.get_updates(offset=offset)
     
@@ -129,6 +163,6 @@ while True:
         gate.write(0)
 
         if not SILENT: bot.send_message(GROUP, 'done')
-        logging.info('open / close gate')
+        logger.info('open / close gate')
 
     time.sleep(3)
