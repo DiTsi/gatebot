@@ -10,9 +10,10 @@ import time
 
 
 BOT_TOKEN = 'nopass'
-# GROUP = -nogroup
+GROUP = -nogroup #! "Parkovka. Bot" group
+# GROUP = -nogroup #! "Parkovka" main group
 # GROUP = -nogroup #! test group
-GROUP = -nogroup #! test group 2
+# GROUP = -nogroup #! test group 2
 SILENT = True
 MESSAGE_TIMEOUT = 30 # seconds
 # ENABLE_BUTTON_NOTIFICATION = True
@@ -53,7 +54,7 @@ class Bot:
             content = json.loads(r.content.decode())
             return content['result']
         except:
-            logger.error('Can\'t send GET request')
+            logger.warning('Can\'t send GET request')
             return {}
 
 
@@ -64,7 +65,7 @@ class Bot:
                 'text': message,
                 })
         except:
-            logger.error('Can\'t send message')
+            logger.warning('Can\'t send message')
 
 
 def filter_mentions(updates):
@@ -111,7 +112,7 @@ def get_messages(updates):
 
 # def enable_notification():
 #     global ENABLE_BUTTON_NOTIFICATION
-    
+
 #     ENABLE_BUTTON_NOTIFICATION = True
 
 
@@ -128,7 +129,7 @@ bot = Bot(BOT_TOKEN)
 
 logger = logging.getLogger('main_logger')
 logger.setLevel('INFO')
-rfh = TimedRotatingFileHandler('/opt/telegram_bot/logs/bot.log', when='D', backupCount=7)
+rfh = TimedRotatingFileHandler('/opt/telegram_bot/logs/bot.log', when='midnight', backupCount=7) # 1.7Mb per day with 'INFO' level
 rfh.setFormatter(CustomFormatter())
 logger.addHandler(rfh)
 
@@ -145,7 +146,7 @@ gate.dir(mraa.DIR_OUT)
 
 offset = None
 while True:
-    logger.info('getting messages')
+    logger.debug('getting messages')
 
     updates = bot.get_updates(offset=offset)
     
@@ -166,3 +167,4 @@ while True:
         logger.info('open / close gate')
 
     time.sleep(3)
+
