@@ -79,10 +79,11 @@ def filter_mentions(updates_):
     result = list()
 
     for u in updates_:
-        message = u['message']
-        if 'entities' in message.keys():
-            if message['entities'][0]['type'] == 'mention':
-                result.append(u)
+        if 'message' in u.keys():
+            message = u['message']
+            if 'entities' in message.keys():
+                if message['entities'][0]['type'] == 'mention':
+                    result.append(u)
     return result
 
 
@@ -132,43 +133,50 @@ def get_messages(updates_):
 #         bot.send_message(GROUP, 'Button pressed, please open the gate')
 #         timer.start()
 
-bot = Bot(BOT_TOKEN)
 
-logger = logging.getLogger('main_logger')
-logger.setLevel('INFO')  # 1.7Mb per day with 'INFO' level
-rfh = TimedRotatingFileHandler('/opt/telegram_bot/logs/bot.log', when='midnight', backupCount=7)
-rfh.setFormatter(CustomFormatter())
-logger.addHandler(rfh)
-gate = Gate(227)
-# timer = threading.Timer(60.0, enable_notification)
+if __name__ == "__main__":
+    DEBUG = True
+    bot = Bot(BOT_TOKEN)
+    logger = logging.getLogger('main_logger')
+    logger.setLevel('INFO')
+    rfh = TimedRotatingFileHandler('./logs/bot.log', when='midnight', backupCount=30)
+    rfh.setFormatter(CustomFormatter())
+    logger.addHandler(rfh)
+    if not DEBUG:
+        gate = Gate(227)
 
+    # button
+    # pin = mraa_.Gpio(3)
+    # pin.dir(mraa_.DIR_IN)
+    # pin.isr(mraa_.EDGE_FALLING, button_handler, None)
+    # timer = threading.Timer(60.0, enable_notification)
 
-# button
-# pin = mraa_.Gpio(3)
-# pin.dir(mraa_.DIR_IN)
-# pin.isr(mraa_.EDGE_FALLING, button_handler, None)
+    offset = None
+    while True:
+        logger.debug('getting messages')
 
-offset = None
-while True:
-    logger.debug('getting messages')
+        updates = bot.get_updates(offset_=offset)
+        
+        logger.debug(f'updates: {len(updates)}')
+        filtered_updates = filter_mentions(updates)
+        logger.debug(f'filter_mentions: {len(filtered_updates)}')
+        filtered_updates = filter_group(filtered_updates, GROUP)
+        logger.debug(f'filtered_updates: {len(filtered_updates)}')
+        filtered_updates = filter_time(filtered_updates)
+        logger.debug(f'filter_time: {len(filtered_updates)}')
+        
+        updates, last_id = get_last_id(updates)
+        offset = last_id + 1 if last_id is not None else None
 
-    updates = bot.get_updates(offset_=offset)
-    
-    filtered_updates = filter_mentions(updates)
-    filtered_updates = filter_group(filtered_updates, GROUP)
-    filtered_updates = filter_time(filtered_updates)
-    
-    updates, last_id = get_last_id(updates)
-    offset = last_id + 1 if last_id is not None else None
+        messages = get_messages(filtered_updates)
+        if len(messages):
+            if not DEBUG:
+                gate.open()
+                time.sleep(0.25)
+                gate.close()
 
-    messages = get_messages(filtered_updates)
-    if len(messages):
-        gate.open()
-        time.sleep(0.25)
-        gate.close()
+            if not SILENT:
+                bot.send_message(GROUP, 'done')
+            logger.info('open / close gate')
 
-        if not SILENT:
-            bot.send_message(GROUP, 'done')
-        logger.info('open / close gate')
-
-    time.sleep(3)
+        time.sleep(3)
