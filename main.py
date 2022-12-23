@@ -9,7 +9,7 @@ import time
 
 
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-GROUP = os.getenv('BOT_GROUP')
+GROUP = int(os.getenv('BOT_GROUP'))
 SILENT = True
 MESSAGE_TIMEOUT_SECONDS = 30
 # ENABLE_BUTTON_NOTIFICATION = True
@@ -135,7 +135,7 @@ def get_messages(updates_):
 
 
 if __name__ == "__main__":
-    DEBUG = True
+    DEBUG = False
     bot = Bot(BOT_TOKEN)
     logger = logging.getLogger('main_logger')
     logger.setLevel('INFO')
